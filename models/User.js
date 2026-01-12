@@ -4,7 +4,7 @@ const userShema=new mongoose.Schema({
     prenom:{type:String,required:true},
     email:{type:String,required:true,unique:true},
     motDePasse:{type:String,required:true},
-    role:{type:String,enum:['admin','client','professionnel'], default:'user'},
+    role:{type:String,enum:['admin','client','professionnel'], default:'client'},
     specialite:{type:String,required:
         function () {
             return this.role === 'professionnel';
