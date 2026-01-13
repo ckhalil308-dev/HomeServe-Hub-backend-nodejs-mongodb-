@@ -55,7 +55,7 @@ exports.login = async (req, res) => {
             return res.status(400).json({message:"Email ou mot de passe incorrect"});
         }
         const token = jwt.sign(
-            { id: existUser._id, role: existUser.role },
+            { id: existUser._id, nom: existUser.nom, prenom: existUser.prenom, role: existUser.role },
              process.env.JWT_SECRET ,
             { expiresIn: '1h' }
         );
