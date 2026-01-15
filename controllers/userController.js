@@ -1,4 +1,5 @@
 const User=require('../models/User');
+const bcrypt=require('bcrypt');
 
 exports.getAllUsers=async(req,res)=>{
     try{
@@ -38,7 +39,7 @@ exports.getAllClients=async(req,res) =>{
 }
 exports.getInfos=async(req,res)=>{
     try{
-        const id =req.user.id;
+        const id =req.user._id;
         const user= await User.findById(id).select('-motDePasse');
         if(!user){
             return res.status(404).json({message:"Utilisateur non trouvé"});
@@ -92,16 +93,61 @@ exports.deleteUser=async(req,res)=>{
         res.status(500).json({message:"Erreur serveur"});
     }
 }
-exports.updateMe=async(req,res)=>{
-    try{
-        const id=req.user.id;
-        const user=await User.findByIdAndUpdate(id,req.body).select('-role');
-        if(!user){
-            return res.status(404).json({message:"Utilisateur non trouvé"});
+exports.updateMe = async (req, res) => {
+    try {
+        const id = req.user._id;
+        const userActuel = await User.findById(id);
+        const updates = {};
+
+        if (req.body.nom && req.body.nom !== userActuel.nom) {
+            updates.nom = req.body.nom;
         }
-        res.status(200).json({message:"Utilisateur mis à jour avec succès", user});
+        if (req.body.prenom && req.body.prenom !== userActuel.prenom) {
+            updates.prenom = req.body.prenom;
+        }
+
+        if (req.body.email && req.body.email !== userActuel.email) {
+            const exitUser = await User.findOne({ email: req.body.email });
+            if (exitUser) {
+                return res.status(400).json({ message: "Email déjà utilisé" });
+            }
+            updates.email = req.body.email;
+        }
+        if (req.user.role === 'professionnel' && req.body.specialite) {
+            updates.specialite = req.body.specialite;
+        }
+        const user = await User.findByIdAndUpdate(id, updates, { 
+            new: true, 
+            runValidators: true 
+        }).select('-motDePasse -role');
+
+        if (!user) {
+            return res.status(404).json({ message: "Utilisateur non trouvé" });
+        }
+
+        res.status(200).json({ message: "Profil mis à jour", user });
+
+    } catch (error) {
+        res.status(500).json({ message: "Erreur serveur" });
+    }
+};
+exports.chnagerMotDePasse=async(req,res)=>{
+    try{
+        const id=req.user._id;
+        const {ancienMotDePasse,nouveauMotDePasse}=req.body;
+        const user=await User.findById(id);
+        const isMatch=await bcrypt.compare(ancienMotDePasse,user.motDePasse);   
+        if(!isMatch){
+            return res.status(400).json({message:"Ancien mot de passe incorrect"});
+        }
+        const salt=await bcrypt.genSalt(10);
+        const hashedPass=await bcrypt.hash(nouveauMotDePasse,salt);
+        user.motDePasse=hashedPass;
+        await user.save();
+        res.status(200).json({message:"Mot de passe changé avec succès"});
     }
     catch(error){
         res.status(500).json({message:"Erreur serveur"});
-    }
+    }   
+
 }
