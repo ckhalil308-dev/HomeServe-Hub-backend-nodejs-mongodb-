@@ -3,7 +3,9 @@ const userShema=new mongoose.Schema({
     nom:{type:String,required:true},
     prenom:{type:String,required:true},
     email:{type:String,required:true,unique:true},
-    motDePasse:{type:String,required:true},
+    motDePasse:{type:String,required:true,
+         minlength: [8, "Le mot de passe doit contenir au moins 8 caractères"]
+    },
     role:{type:String,enum:['admin','client','professionnel'], default:'client'},
     specialite:{type:String,required:
         function () {

@@ -40,7 +40,7 @@ exports.register = async (req, res) => {
         });
 
     } catch (error) {
-        res.status(500).json({ message: "Erreur serveur" });
+        res.status(500).json({ message: "Erreur serveur", error: error.message });
     }
 };
 exports.login = async (req, res) => {
@@ -76,7 +76,7 @@ exports.login = async (req, res) => {
 
     }
      catch (error) {
-        res.status(500).json({ message: "Erreur serveur" });
+        res.status(500).json({ message: "Erreur serveur", error: error.message });
     }
 
 };

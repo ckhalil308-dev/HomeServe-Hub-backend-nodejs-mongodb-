@@ -1,0 +1,14 @@
+ const express = require('express');
+const router = express.Router();
+const serviceController = require('../controllers/serviceController');
+const authMiddleware = require('../middleware/authMiddleware');
+const roleMiddleware = require('../middleware/roleMiddleware');
+const uploadMiddleware = require('../middleware/upload');
+// const uploadMiddleware = require('../middleware/uploadMiddleware');
+router.get('/', serviceController.getAllServices);
+router.get('/:id', serviceController.getServiceById);
+router.post('/', authMiddleware, roleMiddleware(['professionnel']), uploadMiddleware.array('images', 5), serviceController.createService);
+router.delete('/:id', authMiddleware, roleMiddleware(['professionnel']), serviceController.deleteService);
+router.put('/:id', authMiddleware, roleMiddleware(['professionnel']), serviceController.updateService);
+router.get('/professionnel/me', authMiddleware, roleMiddleware(['professionnel']), serviceController.getServiceByProfessionnel);
+module.exports = router;    

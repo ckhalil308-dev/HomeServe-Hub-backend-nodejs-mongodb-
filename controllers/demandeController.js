@@ -3,16 +3,24 @@ const Service=require('../models/Service');
 exports.createDemande=async(req,res)=>{
     try{
         const{ service,description, prix, dateIntervention }=req.body; 
-        const nouvelleDemande = new Demande({
-            status: 'en attente',
-            description,
-            prix,
+        const existService=await Service.findById(service);
+        if(!existService){
+            return res.status(404).json({message:"Service introuvable"});
+        }
+        prixService=existService.prix;
+        if(prix<prixService){
+            return res.status(400).json({message:`Le prix doit être au minimum ${prixService} TND`});
+        }
+    
+        const DemandeData={
             client: req.user._id,
             service,
+            description,
+            prix,
             dateIntervention
-        });
+        };
+        const nouvelleDemande=await Demande.create(DemandeData);
 
-        await nouvelleDemande.save();
         res.status(201).json({ message: "Demande créée", demande: nouvelleDemande  });
 
     }
@@ -38,6 +46,16 @@ exports.geteDemandeForPro=async(req,res)=>{
 
     }
 }
+exports.geteDemandeForClient=async(req,res)=>{
+    try{
+        const clientId=req.user._id;
+        const demandes=await Demande.find({client:clientId}).populate('service','titre description prix').populate('service.professionnelId','nom prenom email');
+        res.status(200).json(demandes);
+    }   
+    catch(error){
+        res.status(500).json({message:"Erreur serveur" , error: error.message});
+    }
+}
 exports.updateStatus = async (req, res) => {
     try {
         const { id } = req.params;
@@ -56,6 +74,6 @@ exports.updateStatus = async (req, res) => {
 
         res.status(200).json({ message: "Statut mis à jour", demande });
     } catch (error) {
-        res.status(500).json({ message: "Erreur serveur" });
+        res.status(500).json({ message: "Erreur serveur" , error: error.message});
     }
 };
