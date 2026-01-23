@@ -11,6 +11,6 @@ router.get('/:id', authMiddleware, roleMiddleware(['admin']), userController.get
 router.delete('/:id', authMiddleware, roleMiddleware(['admin']), userController.deleteUser);
 router.put('/update-me', authMiddleware, userController.updateMe);
 router.get('/specialite/:specialite', authMiddleware, userController.getProByspecialite);
-router.post('/change-password', authMiddleware, userController.chnagerMotDePasse);
+router.put('/change-password', authMiddleware, userController.chnagerMotDePasse);
 module.exports = router;
     

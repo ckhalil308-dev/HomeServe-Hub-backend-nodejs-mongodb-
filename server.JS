@@ -6,6 +6,9 @@ const authRouter = require('./routers/authRoutes');
 const userRouter = require('./routers/userRoutes');
 const demandesRouter = require('./routers/demandesRoutes');
 const serviceRoutes = require('./routers/serviceRoutes');
+const path = require('path');
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(cors({
   origin: '*', // Allow all origins
   credentials: false // No credentials needed

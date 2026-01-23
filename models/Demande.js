@@ -2,7 +2,7 @@ const mongoose=require('mongoose');
 
 const demandeSchema=new mongoose.Schema({
 
-    status:{type:String,required:true,enum:['en attente','approuve','rejete'],default:'en attente'},
+    status:{type:String,required:true,enum:['En attente','Approuve','Rejete'],default:'En attente'},
 
     description:{type:String,required:true},
 
@@ -15,7 +15,7 @@ const demandeSchema=new mongoose.Schema({
     },
 
     service:{
-
+                    
         type:mongoose.Schema.Types.ObjectId,ref:'Service',required:true
 
     },

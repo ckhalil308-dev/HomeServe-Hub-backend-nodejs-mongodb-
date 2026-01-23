@@ -9,6 +9,6 @@ router.get('/', serviceController.getAllServices);
 router.get('/:id', serviceController.getServiceById);
 router.post('/', authMiddleware, roleMiddleware(['professionnel']), uploadMiddleware.array('images', 5), serviceController.createService);
 router.delete('/:id', authMiddleware, roleMiddleware(['professionnel']), serviceController.deleteService);
-router.put('/:id', authMiddleware, roleMiddleware(['professionnel']), serviceController.updateService);
+router.put('/:id', authMiddleware, roleMiddleware(['professionnel']), uploadMiddleware.array('images', 5), serviceController.updateService);
 router.get('/professionnel/me', authMiddleware, roleMiddleware(['professionnel']), serviceController.getServiceByProfessionnel);
 module.exports = router;    

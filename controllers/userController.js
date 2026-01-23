@@ -100,7 +100,7 @@ exports.updateMe = async (req, res) => {
         const updates = {};
 
         if (req.body.nom && req.body.nom !== userActuel.nom) {
-            updates.nom = req.body.nom;
+            updates.nom = req.body.nom; 
         }
         if (req.body.prenom && req.body.prenom !== userActuel.prenom) {
             updates.prenom = req.body.prenom;
@@ -150,4 +150,4 @@ exports.chnagerMotDePasse=async(req,res)=>{
         res.status(500).json({message:"Erreur serveur"});
     }   
 
-}
+}   
