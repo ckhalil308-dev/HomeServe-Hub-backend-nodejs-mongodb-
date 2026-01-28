@@ -7,6 +7,7 @@ router.get('/all', authMiddleware, roleMiddleware(['admin']), userController.get
 router.get('/pros', authMiddleware, roleMiddleware(['admin']), userController.getAllPros);
 router.get('/clients', authMiddleware, roleMiddleware(['admin']), userController.getAllClients);
 router.get('/me', authMiddleware, userController.getInfos);
+router.get('/BannedUsers', authMiddleware, roleMiddleware(['admin']), userController.getBannedUsers);
 router.get('/:id', authMiddleware, roleMiddleware(['admin']), userController.getUserById);
 router.delete('/:id', authMiddleware, roleMiddleware(['admin']), userController.deleteUser);
 router.put('/update-me', authMiddleware, userController.updateMe);
@@ -16,6 +17,6 @@ router.put('/verify-professional/:id', authMiddleware, roleMiddleware(['admin'])
 router.put('/ban-user/:id', authMiddleware, roleMiddleware(['admin']), userController.bannirUtilisateur);
 router.put('/unban-user/:id', authMiddleware, roleMiddleware(['admin']), userController.debannirUtilisateur);
 router.put('/modify-user/:id', authMiddleware, roleMiddleware(['admin']), userController.modifierUsersByAdmin);
-router.get('/BannedUsers', authMiddleware, roleMiddleware(['admin']), userController.getBannedUsers);
+
 module.exports = router;
     

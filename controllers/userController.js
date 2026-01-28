@@ -273,8 +273,30 @@ exports.debannirUtilisateur = async (req, res) => {
 }
 exports.getBannedUsers = async (req, res) => {
     try {
-        const bannedUsers = await User.find({ isBanned: true }).select('-motDePasse');
-        res.status(200).json(bannedUsers);
+        
+         const limit = 10;
+        const page = parseInt(req.query.page    ) || 1;
+        const skip = (page - 1) * limit;
+        const Search = req.query.Search || '';
+        const nom = Search.split(' ')[1] || '';
+        const prenom = Search.split(' ')[0] || '';
+            let query = {
+            isBanned: true,
+            $or: [
+                { nom: { $regex: nom, $options: 'i' } },
+                { prenom: { $regex: prenom, $options: 'i' } },
+            ]
+        };
+
+        const bannedUsers = await User.find(query).select('-motDePasse').skip(skip).limit(limit);
+        const totalDocs = await User.countDocuments(query);
+
+        res.status(200).json({ bannedUsers, 
+                               totalDocs,
+                                totalPages: Math.ceil(totalDocs / limit),
+                                 currentPage: page,
+
+         });
     }
     catch (error) {
         res.status(500).json({ message: "Erreur serveur" });
@@ -322,7 +344,7 @@ exports.modifierUsersByAdmin = async (req, res) => {
         const user = await User.findByIdAndUpdate(id, updates, {
             new: true,
             runValidators: true
-        }).select('-motDePasse ');
+        }).select('-motDePasse');
         res.status(200).json({ message: "Utilisateur mis à jour avec succès", user });
     } catch (error) {
         res.status(500).json({ message: "Erreur serveur" });

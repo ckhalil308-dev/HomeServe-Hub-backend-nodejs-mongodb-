@@ -56,42 +56,54 @@ exports.geteDemandeForPro = async (req, res) => {
     }
 }
 exports.geteDemandeForClient = async (req, res) => {
-    try {
-        const { status } = req.query;
-        // const skip = (page - 1) * limit;
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = 5;
+    const skip = (page - 1) * limit;
 
-        const clientId = req.user._id;
-        if (status != "En attente" && status != "Approuve" && status != "Rejete" && status != "Termine" && status != "Offre envoyée" && status != "tous") {
-            return res.status(400).json({ message: "Statut invalide" });
-        }
+    const clientId = req.user._id;
+    const status = req.query.status; // optionnel
 
-        if (status == "tous") {
-            const demandes = await Demande.find({ client: clientId, status: { $in: ["En attente", "Termine", "Rejete", "Offre envoyée"] } }).populate({
-                path: 'service',
-                select: 'titre description prix professionnelId',
-                populate: {
-                    path: 'professionnelId',
-                    select: 'nom prenom email'
-                }
-            }).sort({ createdAt: -1 })
-                ;
-            return res.status(200).json(demandes);
+    const filter = { client: clientId };
+
+    if (status && status !== 'tous') {
+      filter.status = status;
+    }
+    const touslesDemandesCount = await Demande.countDocuments({ client: clientId });
+    const demandesTermineesCount = await Demande.countDocuments({ client: clientId, status: 'Termine' });
+    const demandesEnAttenteCount = await Demande.countDocuments({ client: clientId, status: 'En attente' });
+    const demandesOffreEnvoyeeCount = await Demande.countDocuments({ client: clientId, status: 'Offre envoyée' });
+    const demandesApprouveCount = await Demande.countDocuments({ client: clientId, status: 'Approuve' });
+    const demandesRejeteCount = await Demande.countDocuments({ client: clientId, status: 'Rejete' });
+   
+    const demandes = await Demande.find(filter)
+      .populate({
+        path: 'service',
+        select: 'titre description prix professionnelId',
+        populate: {
+          path: 'professionnelId',
+          select: 'nom prenom email'
         }
-        const demandes = await Demande.find({ client: clientId, status: status }).sort({ createdAt: -1 })
-            .populate({
-                path: 'service',
-                select: 'titre description prix professionnelId',
-                populate: {
-                    path: 'professionnelId',
-                    select: 'nom prenom email'
-                }
-            }).sort({ createdAt: -1 })
-        res.status(200).json(demandes);
-    }
-    catch (error) {
-        res.status(500).json({ message: "Erreur serveur", error: error.message });
-    }
-}
+      })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    res.status(200).json({
+      demandes,
+      touslesDemandesCount,
+      demandesTermineesCount,
+      demandesEnAttenteCount,
+      demandesOffreEnvoyeeCount,
+      demandesApprouveCount,
+      demandesRejeteCount
+    
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: "Erreur serveur", error: error.message });
+  }
+};
 exports.updateStatus = async (req, res) => {
     try {
         const demandeId = req.params.id;

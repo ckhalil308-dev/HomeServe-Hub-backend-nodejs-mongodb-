@@ -3,10 +3,11 @@ const User = require("../models/User");
 
 exports.getAllServices = async (req, res) => {
     try {
-        const { category, minPrice, maxPrice } = req.query;
+        const limit = 9;
+        const { category, minPrice, maxPrice,page = 1 ,search= "" } = req.query;
 
         let filter = {};
-        if (category) {
+        if (category && category !== 'tous') {
             filter.category = category;
         }
         if (minPrice || maxPrice) {
@@ -14,9 +15,14 @@ exports.getAllServices = async (req, res) => {
             if (minPrice) filter.prix.$gte = Number(minPrice);
             if (maxPrice) filter.prix.$lte = Number(maxPrice);
         }
+        if (search) {
+            filter.titre = { $regex: search, $options: 'i' };
+        }
 
-        const services = await Service.find(filter).populate('professionnelId', 'nom prenom email');
-        res.status(200).json(services);
+        const services = await Service.find(filter).limit(limit).skip((page - 1) * limit).populate('professionnelId', 'nom prenom email');
+        res.status(200).json({services,
+                              totalPages: Math.ceil(await Service.countDocuments(filter) / limit),
+        });
     }
     catch (error) {
         res.status(500).json({ message: error.message });
