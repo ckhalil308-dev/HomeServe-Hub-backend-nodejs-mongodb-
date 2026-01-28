@@ -54,6 +54,9 @@ exports.login = async (req, res) => {
         if(!isMatch){
             return res.status(400).json({message:"Email ou mot de passe incorrect"});
         }
+        if(existUser.isBanned){
+            return res.status(403).json({message:"Compte banni. Contactez l'administrateur."});
+        }
         const token = jwt.sign(
             { id: existUser._id, nom: existUser.nom, prenom: existUser.prenom, role: existUser.role },
              process.env.JWT_SECRET ,

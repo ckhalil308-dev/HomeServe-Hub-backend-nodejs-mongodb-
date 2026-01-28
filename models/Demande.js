@@ -2,17 +2,19 @@ const mongoose=require('mongoose');
 
 const demandeSchema=new mongoose.Schema({
 
-    status:{type:String,required:true,enum:['En attente','Approuve','Rejete'],default:'En attente'},
+    status:{type:String,required:true,enum:['En attente','Approuve','Rejete','Termine','Offre envoyée'],default:'En attente'},
 
     description:{type:String,required:true},
 
     prix:{type:Number,required:true},
 
-    client:{
+      client:{
 
         type:mongoose.Schema.Types.ObjectId,ref:'User',required:true
 
     },
+    adresse:{type:String,required:true},
+    numeroTelephone:{type:String,required:true},
 
     service:{
                     
@@ -20,7 +22,7 @@ const demandeSchema=new mongoose.Schema({
 
     },
 
-    dateIntervention:{type:Date,required:true},
+    dateIntervention:{type:Date,required:true},     
 
 
 

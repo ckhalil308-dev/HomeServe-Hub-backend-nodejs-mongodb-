@@ -12,5 +12,10 @@ router.delete('/:id', authMiddleware, roleMiddleware(['admin']), userController.
 router.put('/update-me', authMiddleware, userController.updateMe);
 router.get('/specialite/:specialite', authMiddleware, userController.getProByspecialite);
 router.put('/change-password', authMiddleware, userController.chnagerMotDePasse);
+router.put('/verify-professional/:id', authMiddleware, roleMiddleware(['admin']), userController.verifyProfessionnel);
+router.put('/ban-user/:id', authMiddleware, roleMiddleware(['admin']), userController.bannirUtilisateur);
+router.put('/unban-user/:id', authMiddleware, roleMiddleware(['admin']), userController.debannirUtilisateur);
+router.put('/modify-user/:id', authMiddleware, roleMiddleware(['admin']), userController.modifierUsersByAdmin);
+router.get('/BannedUsers', authMiddleware, roleMiddleware(['admin']), userController.getBannedUsers);
 module.exports = router;
     

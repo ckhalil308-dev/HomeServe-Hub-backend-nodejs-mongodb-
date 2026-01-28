@@ -1,4 +1,5 @@
 const Service = require("../models/Service");
+const User = require("../models/User");
 
 exports.getAllServices = async (req, res) => {
     try {
@@ -34,26 +35,30 @@ exports.getServiceById = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 }
-exports.createService = async (req, res) => {
-    try {
-        const professionnelId = req.user._id;
-        const { titre, description, prix, category } = req.body;
-        const images = req.files.map(file => file.path);
-        const ServiceData = {
-            titre,
-            description,
-            prix,
-            category,
-            professionnelId,
-            imagesUrls: images
-        };
-        const newService = await Service.create(ServiceData);
-        res.status(201).json(newService);
+    exports.createService = async (req, res) => {
+        try {
+            const professionnelId = req.user._id;
+            const { titre, description, prix, category } = req.body;
+            const images = req.files.map(file => file.path);
+            const professionnel = await User.findById(professionnelId);
+            if(!professionnel.isVerified){
+                return res.status(403).json({message:"Votre compte doit être vérifié pour ajouter un service"});
+            }
+            const ServiceData = {
+                titre,
+                description,
+                prix,
+                category,
+                professionnelId,
+                imagesUrls: images
+            };
+            const newService = await Service.create(ServiceData);
+            res.status(201).json(newService);
+        }
+        catch (error) {
+            res.status(500).json({ message: error.message });
+        }
     }
-    catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-}
 exports.deleteService = async (req, res) => {
     try {
         const id = req.params.id;
