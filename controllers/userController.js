@@ -280,59 +280,105 @@ exports.getBannedUsers = async (req, res) => {
 
 // Update user by admin
 exports.modifierUsersByAdmin = async (req, res) => {
+
     try {
+
         const id = req.params.id;
+
         const updates = { ...req.body };
 
-        // 1. Trouver l'utilisateur actuel
+
+
+
+
         const userActuel = await User.findById(id);
+
         if (!userActuel) return res.status(404).json({ message: "Utilisateur non trouvé" });
 
-        // 2. Gestion du changement de rôle (Discriminateur)
+
+
+       
+
         if (updates.role && updates.role !== userActuel.role) {
-            
-            // On détermine le nom du modèle (Discriminator Key)
-            // Souvent c'est 'Client' ou 'Professionnel' avec une Majuscule
+
+           
+
+           
+
             const typeValue = updates.role === 'professionnel' ? 'professionnel' : 'client';
 
-            // On utilise le driver natif pour forcer le changement du champ role
+
+
+         
+
             await User.collection.updateOne(
+
                 { _id: new mongoose.Types.ObjectId(id) },
-                { 
-                    $set: { 
+
+                {
+
+                    $set: {
+
                         role: updates.role,
-                        // Si ton schéma utilise un autre nom pour le discriminateur, 
-                        // vérifie si c'est '__t' ou 'role'
-                    } 
+
+                   
+
+                    }
+
                 }
+
             );
 
-            // Si le nouveau rôle est professionnel, on ajoute les champs obligatoires
+
+
+           
+
             if (updates.role === 'professionnel') {
+
                 await User.collection.updateOne(
+
                     { _id: new mongoose.Types.ObjectId(id) },
+
                     { $set: { isVerified: false, specialite: updates.specialite || "À définir" } }
+
                 );
+
             }
+
         }
 
-        // 3. Mise à jour des autres champs (nom, prenom, email) via Mongoose
-        // On retire le rôle des updates Mongoose pour éviter le conflit de discriminateur
         const { role, ...autresUpdates } = updates;
-        
+
+       
+
         const userMisAJour = await User.findByIdAndUpdate(
-            id, 
-            { $set: autresUpdates }, 
+
+            id,
+
+            { $set: autresUpdates },
+
             { new: true, runValidators: true }
+
         ).select('-motDePasse');
 
-        res.status(200).json({ 
-            message: "Utilisateur mis à jour avec succès", 
-            user: userMisAJour 
+
+
+        res.status(200).json({
+
+            message: "Utilisateur mis à jour avec succès",
+
+            user: userMisAJour
+
         });
 
+
+
     } catch (error) {
-        console.error("Erreur Admin Update:", error); // Pour voir l'erreur réelle dans ton terminal
+
+        console.error("Erreur Admin Update:", error);
+
         res.status(500).json({ message: "Erreur lors de la modification", error: error.message });
+
     }
-};
+
+}; 
