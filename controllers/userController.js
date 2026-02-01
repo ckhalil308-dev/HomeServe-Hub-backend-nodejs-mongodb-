@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Client = require('../models/Client');
 const Professionnel = require('../models/Professionnel');
 const bcrypt = require('bcrypt');
+const mongoose = require('mongoose');
 
 // Get all users (admin view)
 exports.getAllUsers = async (req, res) => {
@@ -154,23 +155,26 @@ exports.deleteUser = async (req, res) => {
 exports.updateMe = async (req, res) => {
     try {
         const id = req.user._id;
-        const userActuel = await User.findById(id);
-        if (!userActuel) return res.status(404).json({ message: "Utilisateur non trouvé" });
+        const role = req.user.role; // Récupéré via ton middleware auth
 
         const updates = {};
-        if (req.body.nom && req.body.nom !== userActuel.nom) updates.nom = req.body.nom;
-        if (req.body.prenom && req.body.prenom !== userActuel.prenom) updates.prenom = req.body.prenom;
-        if (req.body.email && req.body.email !== userActuel.email) {
-            const existUser = await User.findOne({ email: req.body.email });
-            if (existUser) return res.status(400).json({ message: "Email déjà utilisé" });
-            updates.email = req.body.email;
+        if (req.body.nom) updates.nom = req.body.nom;
+        if (req.body.prenom) updates.prenom = req.body.prenom;
+        if (req.body.email) updates.email = req.body.email;
+
+        // Utiliser le bon modèle selon le rôle pour accepter les champs spécifiques
+        let modelToUse = User;
+        if (role === 'professionnel') {
+            modelToUse = Professionnel;
+            if (req.body.specialite) updates.specialite = req.body.specialite;
         }
 
-        if (userActuel.role === 'professionnel' && req.body.specialite) {
-            updates.specialite = req.body.specialite;
-        }
+        const user = await modelToUse.findByIdAndUpdate(
+            id, 
+            { $set: updates }, 
+            { new: true, runValidators: true }
+        ).select('-motDePasse');
 
-        const user = await User.findByIdAndUpdate(id, updates, { new: true, runValidators: true }).select('-motDePasse -role');
         res.status(200).json({ message: "Profil mis à jour", user });
     } catch (error) {
         res.status(500).json({ message: "Erreur serveur" });
@@ -276,32 +280,59 @@ exports.getBannedUsers = async (req, res) => {
 
 // Update user by admin
 exports.modifierUsersByAdmin = async (req, res) => {
-    const allowedRoles = ['client', 'professionnel'];
     try {
         const id = req.params.id;
+        const updates = { ...req.body };
+
+        // 1. Trouver l'utilisateur actuel
         const userActuel = await User.findById(id);
         if (!userActuel) return res.status(404).json({ message: "Utilisateur non trouvé" });
 
-        const updates = {};
-        if (req.body.nom && req.body.nom !== userActuel.nom) updates.nom = req.body.nom;
-        if (req.body.prenom && req.body.prenom !== userActuel.prenom) updates.prenom = req.body.prenom;
-        if (req.body.email && req.body.email !== userActuel.email) {
-            const exitUser = await User.findOne({ email: req.body.email });
-            if (exitUser) return res.status(400).json({ message: "Email déjà utilisé" });
-            updates.email = req.body.email;
-        }
+        // 2. Gestion du changement de rôle (Discriminateur)
+        if (updates.role && updates.role !== userActuel.role) {
+            
+            // On détermine le nom du modèle (Discriminator Key)
+            // Souvent c'est 'Client' ou 'Professionnel' avec une Majuscule
+            const typeValue = updates.role === 'professionnel' ? 'professionnel' : 'client';
 
-        if (req.body.role && allowedRoles.includes(req.body.role) && req.body.role !== userActuel.role) {
-            if (req.body.role === "professionnel") {
-                updates.isVerified = false;
-                updates.specialite = "À définir";
+            // On utilise le driver natif pour forcer le changement du champ role
+            await User.collection.updateOne(
+                { _id: new mongoose.Types.ObjectId(id) },
+                { 
+                    $set: { 
+                        role: updates.role,
+                        // Si ton schéma utilise un autre nom pour le discriminateur, 
+                        // vérifie si c'est '__t' ou 'role'
+                    } 
+                }
+            );
+
+            // Si le nouveau rôle est professionnel, on ajoute les champs obligatoires
+            if (updates.role === 'professionnel') {
+                await User.collection.updateOne(
+                    { _id: new mongoose.Types.ObjectId(id) },
+                    { $set: { isVerified: false, specialite: updates.specialite || "À définir" } }
+                );
             }
-            updates.role = req.body.role;
         }
 
-        const user = await User.findByIdAndUpdate(id, updates, { new: true, runValidators: true }).select('-motDePasse');
-        res.status(200).json({ message: "Utilisateur mis à jour avec succès", user });
+        // 3. Mise à jour des autres champs (nom, prenom, email) via Mongoose
+        // On retire le rôle des updates Mongoose pour éviter le conflit de discriminateur
+        const { role, ...autresUpdates } = updates;
+        
+        const userMisAJour = await User.findByIdAndUpdate(
+            id, 
+            { $set: autresUpdates }, 
+            { new: true, runValidators: true }
+        ).select('-motDePasse');
+
+        res.status(200).json({ 
+            message: "Utilisateur mis à jour avec succès", 
+            user: userMisAJour 
+        });
+
     } catch (error) {
-        res.status(500).json({ message: "Erreur serveur" });
+        console.error("Erreur Admin Update:", error); // Pour voir l'erreur réelle dans ton terminal
+        res.status(500).json({ message: "Erreur lors de la modification", error: error.message });
     }
 };
