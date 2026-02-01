@@ -1,28 +1,17 @@
-const  mongoose  = require('mongoose');
-const userShema=new mongoose.Schema({
-    nom:{type:String,required:true},
-    prenom:{type:String,required:true},
-    email:{type:String,required:true,unique:true},
-    motDePasse:{type:String,required:true,
-         minlength: [8, "Le mot de passe doit contenir au moins 8 caractères"]
-    },
-    role:{type:String,enum:['admin','client','professionnel'], default:'client'},
-    specialite:{type:String,required:
-        function () {
-            return this.role === 'professionnel';
-            
-        }
-    },
-   isVerified: { 
-        type: Boolean, 
-        default: false 
-    },
-    isBanned: { 
-        type: Boolean, 
-        default: false 
-    },
+const mongoose = require('mongoose');
 
+const userSchema = new mongoose.Schema({
+    nom: { type: String, required: true },
+    prenom: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    motDePasse: { type: String, required: true, minlength: 8 },
+    isVerified: { type: Boolean, default: false },
+    isBanned: { type: Boolean, default: false }
+}, {
+    timestamps: true,
+    discriminatorKey: 'role' // 🔴 this line enables inheritance
+});
 
-},{timestamps:true});
-const User=mongoose.model('User',userShema);
-module.exports=User;
+const User = mongoose.model('User', userSchema);
+
+module.exports = User;
