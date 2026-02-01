@@ -1,5 +1,6 @@
 const Service = require("../models/Service");
 const User = require("../models/User");
+const Demande = require("../models/Demande");
 
 exports.getAllServices = async (req, res) => {
     try {
@@ -75,6 +76,7 @@ exports.deleteService = async (req, res) => {
         if (service.professionnelId.toString() !== req.user._id.toString()) {
             return res.status(403).json({ message: "Not authorized" });
         }
+        await Demande.deleteMany({  service: id });
         await Service.findByIdAndDelete(id);
         res.status(200).json({ message: "Service deleted" });
     }

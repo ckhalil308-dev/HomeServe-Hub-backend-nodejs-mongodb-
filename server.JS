@@ -6,6 +6,9 @@ const authRouter = require('./routers/authRoutes');
 const userRouter = require('./routers/userRoutes');
 const demandesRouter = require('./routers/demandesRoutes');
 const serviceRoutes = require('./routers/serviceRoutes');
+const aiRoutes = require('./routers/aiRoutes');
+const commentsRoutes = require('./routers/CommentsRoutes');
+
 const path = require('path');
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -26,6 +29,8 @@ app.use("/api/auth",authRouter);
 app.use("/api/users",userRouter);
 app.use('/api/demandes', demandesRouter);
 app.use('/api/services', serviceRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/comments', commentsRoutes);
 
 app.listen(port, () => console.log(`Server running on http://localhost:${port}`));
 
