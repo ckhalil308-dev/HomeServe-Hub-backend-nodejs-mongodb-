@@ -9,7 +9,7 @@ const userSchema = new mongoose.Schema({
     isBanned: { type: Boolean, default: false }
 }, {
     timestamps: true,
-    discriminatorKey: 'role' // 🔴 this line enables inheritance
+    discriminatorKey: 'role' 
 });
 
 const User = mongoose.model('User', userSchema);

@@ -118,7 +118,6 @@ exports.getInfos = async (req, res) => {
     }
 };
 
-// Get user by id
 exports.getUserById = async (req, res) => {
     try {
         const id = req.params.id;
@@ -130,7 +129,6 @@ exports.getUserById = async (req, res) => {
     }
 };
 
-// Get professional by specialty
 exports.getProByspecialite = async (req, res) => {
     try {
         const specialite = req.params.specialite;
@@ -141,7 +139,6 @@ exports.getProByspecialite = async (req, res) => {
     }
 };
 
-// Delete user
 exports.deleteUser = async (req, res) => {
     try {
         const id = req.params.id;
@@ -153,7 +150,7 @@ exports.deleteUser = async (req, res) => {
     }
 };
 
-// Update own profile
+
 exports.updateMe = async (req, res) => {
     try {
         const id = req.user._id;
