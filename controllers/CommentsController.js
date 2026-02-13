@@ -2,6 +2,7 @@ const Commentaire=require('../models/Commentaire');
 const dotenv = require('dotenv');
 const Service=require('../models/Service');
 const Demande=require('../models/Demande');
+const mongoose = require('mongoose');
  dotenv.config();
 const Groq = require("groq-sdk");
 
@@ -65,23 +66,37 @@ exports.ajouterCommentaire=async(req,res)=>{
         res.status(500).json({message:"Erreur serveur",error:error.message});
     }
 };
-exports.getCommentairesParService=async(req,res)=>{
-    try{
-        const page=req.query.page || 1;
-        const limit=5;
-        const skip=(page-1)*limit;
+exports.getCommentairesParService = async (req, res) => {
+    try {
+        const { serviceId } = req.params;
+        const page = parseInt(req.query.page) || 1;
+        const limit = 5;
+        const skip = (page - 1) * limit;
 
-        const serviceId=req.params.serviceId;
-        const commentaires=await Commentaire.find({service:serviceId}).populate('auteur','nom prenom').skip(skip).limit(limit).sort({createdAt:-1});
-        res.status(200).json({commentaires,
-                              totalPages:Math.ceil(await Commentaire.countDocuments({service:serviceId})/limit),
-                              totaleCommentaires:await Commentaire.countDocuments({service:serviceId})
-
-
+        // 1. Exécuter les requêtes en parallèle pour gagner du temps
+        const [commentaires, totalCommentaires, averageNote] = await Promise.all([
+            Commentaire.find({ service: serviceId })
+                .populate('auteur', 'nom prenom')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            Commentaire.countDocuments({ service: serviceId }),
+            Commentaire.aggregate([
+                { $match: { service: new mongoose.Types.ObjectId(serviceId) } },
+                { $group: { _id: null, avgNote: { $avg: "$note" } } }
+            ])
+        ]);
+        const avgNote = averageNote.length > 0 ? averageNote[0].avgNote : 0;
+        res.status(200).json({
+            commentaires,
+            avgNote: parseFloat(avgNote.toFixed(1)), 
+            totalCommentaires,
+            totalPages: Math.ceil(totalCommentaires / limit),
+            currentPage: page
         });
-    }
-    catch(error){
-        res.status(500).json({message:"Erreur serveur",error:error.message});
+
+    } catch (error) {
+        res.status(500).json({ message: "Erreur serveur", error: error.message });
     }
 };
 

@@ -5,7 +5,7 @@ const Demande = require("../models/Demande");
 exports.getAllServices = async (req, res) => {
     try {
         const limit = 9;
-        const { category, minPrice, maxPrice,page = 1 ,search= "" } = req.query;
+        const { category, minPrice, maxPrice, page = 1, search = "" } = req.query;
 
         let filter = {};
         if (category && category !== 'tous') {
@@ -20,15 +20,35 @@ exports.getAllServices = async (req, res) => {
             filter.titre = { $regex: search, $options: 'i' };
         }
 
-        const services = await Service.find(filter).limit(limit).skip((page - 1) * limit).populate('professionnelId', 'nom prenom email');
-        res.status(200).json({services,
-                              totalPages: Math.ceil(await Service.countDocuments(filter) / limit),
+        // Count only active services
+        const total = await Service.aggregate([
+            { $match: filter },
+            { $lookup: { from: 'users', localField: 'professionnelId', foreignField: '_id', as: 'professionnel' } },
+            { $unwind: '$professionnel' },
+            { $match: { 'professionnel.role': 'professionnel', 'professionnel.isVerified': true } },
+            { $count: 'total' }
+        ]);
+
+        const totalCount = total[0]?.total || 0;
+
+        const services = await Service.find(filter)
+            .limit(limit)
+            .skip((page - 1) * limit)
+            .populate('professionnelId', 'nom prenom email role isVerified');
+
+        const activeServices = services.filter(service => {
+            const professionnel = service.professionnelId;
+            return professionnel && professionnel.role === 'professionnel' && professionnel.isVerified;
         });
-    }
-    catch (error) {
+
+        res.status(200).json({
+            services: activeServices,
+            totalPages: Math.ceil(totalCount / limit)
+        });
+    } catch (error) {
         res.status(500).json({ message: error.message });
     }
-}
+};
 exports.getServiceById = async (req, res) => {
     try {
         const id = req.params.id;

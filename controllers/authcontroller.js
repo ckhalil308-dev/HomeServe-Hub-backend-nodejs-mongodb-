@@ -56,7 +56,7 @@ exports.register = async (req, res) => {
 
 exports.login = async (req, res) => {
     try {
-        const { email, motDePasse } = req.body;
+        const { email, motDePasse,rememberMe } = req.body;
 
         const existUser = await User.findOne({ email: email.toLowerCase() });
         if (!existUser) {
@@ -75,7 +75,7 @@ exports.login = async (req, res) => {
         const token = jwt.sign(
             { id: existUser._id, nom: existUser.nom, prenom: existUser.prenom, role: existUser.role },
             process.env.JWT_SECRET,
-            { expiresIn: '1h' }
+            { expiresIn: rememberMe ? '30d' : '2h' }
         );
 
         res.status(200).json({

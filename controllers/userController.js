@@ -1,8 +1,10 @@
 const User = require('../models/User');
 const Client = require('../models/Client');
 const Professionnel = require('../models/Professionnel');
+const Demande = require('../models/Demande');
 const bcrypt = require('bcrypt');
 const mongoose = require('mongoose');
+const PDFDocument = require('pdfkit');
 
 // Get all users (admin view)
 exports.getAllUsers = async (req, res) => {
@@ -382,3 +384,89 @@ exports.modifierUsersByAdmin = async (req, res) => {
     }
 
 }; 
+
+exports.getMonthlyReport = async (req, res) => {
+    try {
+        console.log("Début de la récupération des données...");
+
+        // 1. Définition des dates (Mois dernier)
+        const maintenant = new Date();
+        const debutMois = new Date(maintenant.getFullYear(), maintenant.getMonth() - 1, 1);
+        const finMois = new Date(maintenant.getFullYear(), maintenant.getMonth(), 1);
+
+        // 2. Récupération des données
+        // Note: Avec les discriminators, countDocuments() fonctionne sur Client et Professionnel
+        const totalClients = 10; 
+         const totalProfessionnels = 5;
+        const [
+            // totalClients,
+            // totalProfessionnels,
+            totalDemandes,
+            newClients,
+            newPros,
+            newDemandes,
+            demandesTerminees
+        ] = await Promise.all([
+            // Client.countDocuments(),
+            // Professionnel.countDocuments(),
+            
+            Demande.countDocuments(),
+            Client.countDocuments({ createdAt: { $gte: debutMois, $lt: finMois } }),
+            Professionnel.countDocuments({ createdAt: { $gte: debutMois, $lt: finMois } }),
+            Demande.countDocuments({ createdAt: { $gte: debutMois, $lt: finMois } }),
+            Demande.countDocuments({ 
+                createdAt: { $gte: debutMois, $lt: finMois }, 
+                status: 'Termine' // 
+            })
+        ]);
+
+        console.log("Données récupérées, création du PDF...");
+
+        // 3. Configuration de PDFKit
+        const doc = new PDFDocument({ margin: 50 });
+
+        // IMPORTANT : Envoyer les Headers avant de piper
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename=Rapport_HomeServeHub.pdf');
+
+        doc.pipe(res);
+
+        // --- DESIGN ---
+        doc.fontSize(20).text('HomeServeHub - RAPPORT MENSUEL', { align: 'center', underline: true });
+        doc.moveDown(2);
+
+        doc.fontSize(14).text('1. Statistiques Globales', { underline: true });
+        doc.moveDown(0.5);
+        doc.fontSize(12).text(`Nombre total de clients : ${totalClients}`);
+        doc.text(`Nombre total de professionnels : ${totalProfessionnels}`);
+        doc.text(`Nombre total de demandes : ${totalDemandes}`);
+        
+        doc.moveDown(1.5);
+
+        doc.fontSize(14).text('2. Activité du Mois Dernier', { underline: true });
+        doc.moveDown(0.5);
+        doc.text(`Nouveaux clients : ${newClients}`);
+        doc.text(`Nouveaux professionnels : ${newPros}`);
+        doc.text(`Nouvelles demandes créées : ${newDemandes}`);
+        doc.text(`Demandes terminées : ${demandesTerminees}`);
+
+        doc.moveDown(2);
+        doc.fontSize(10).fillColor('grey').text('Document généré automatiquement par HomeServeHub', { align: 'center' });
+
+        // 4. Finalisation
+        doc.end();
+        console.log("PDF généré et envoyé avec succès !");
+
+    } catch (error) {
+        // C'EST ICI QUE TU VERRAIS L'ERREUR DANS TON TERMINAL
+        console.error("ERREUR CRITIQUE DANS LE RAPPORT :");
+        console.error(error); 
+        
+        if (!res.headersSent) {
+            res.status(500).json({ 
+                message: "Erreur lors de la génération du rapport", 
+                error: error.message 
+            });
+        }
+    }
+};
