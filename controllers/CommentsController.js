@@ -99,4 +99,25 @@ exports.getCommentairesParService = async (req, res) => {
         res.status(500).json({ message: "Erreur serveur", error: error.message });
     }
 };
+exports.getRatingPerService = async (req, res) => {
+    try {
+        // 1. Get the ID specifically from params (match your route variable, e.g., :id)
+        const { id } = req.params; 
+
+        // 2. You MUST await the aggregation, otherwise it's just a pending Promise
+        const stats = await Commentaire.aggregate([
+            { $match: { service: new mongoose.Types.ObjectId(id) } },
+            { $group: { _id: null, avgNote: { $avg: "$note" } } }
+        ]);
+        const nbr=await Commentaire.countDocuments({ service: id });
+
+        // 3. Extract the value safely
+        const avgNote = stats.length > 0 ? stats[0].avgNote : 0;
+
+        // 4. Return as a number (or { rating: avgNote })
+        res.status(200).json({ avgNote, nbr }); 
+    } catch (error) {
+        res.status(500).json({ message: "Erreur serveur", error: error.message });
+    }
+};
 

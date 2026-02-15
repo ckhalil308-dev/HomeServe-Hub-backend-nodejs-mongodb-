@@ -33,7 +33,8 @@ exports.getAllPros = async (req, res) => {
                 { prenom: { $regex: prenom, $options: 'i' } },
                 { specialite: { $regex: Search, $options: 'i' } }
             ],
-            isBanned: false
+            isBanned: false,
+            isVerified: true
         };
 
         const [allPros, totalDocs, ProsNonVerifie, TotalNonVerifie] = await Promise.all([

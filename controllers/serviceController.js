@@ -6,43 +6,75 @@ exports.getAllServices = async (req, res) => {
     try {
         const limit = 9;
         const { category, minPrice, maxPrice, page = 1, search = "" } = req.query;
+        const skip = (Number(page) - 1) * limit;
 
+        // 1. Initial Filter
         let filter = {};
-        if (category && category !== 'tous') {
-            filter.category = category;
-        }
+        if (category && category !== 'Tous') filter.category = category;
         if (minPrice || maxPrice) {
             filter.prix = {};
             if (minPrice) filter.prix.$gte = Number(minPrice);
             if (maxPrice) filter.prix.$lte = Number(maxPrice);
         }
-        if (search) {
-            filter.titre = { $regex: search, $options: 'i' };
-        }
+        if (search) filter.titre = { $regex: search, $options: 'i' };
 
-        // Count only active services
+        // 2. Main Aggregation Pipeline
+      const services = await Service.aggregate([
+    { $match: filter },
+    
+    // Join with Users
+    { $lookup: { from: 'users', localField: 'professionnelId', foreignField: '_id', as: 'pro' } },
+    { $unwind: '$pro' },
+    
+    // Security Filter (Verified only)
+    { $match: { 'pro.role': 'professionnel', 'pro.isVerified': true } },
+
+    // Join with Comments
+    { $lookup: { from: 'commentaires', localField: '_id', foreignField: 'service', as: 'ratings' } },
+
+    // Add calculations
+    {
+        $addFields: {
+            avgNote: { $ifNull: [{ $avg: "$ratings.note" }, 0] },
+            nbrRatings: { $size: "$ratings" }
+        }
+    },
+
+    { $skip: (Number(page) - 1) * limit },
+    { $limit: limit },
+
+    // --- THE CLEANUP STAGE (Like SQL SELECT) ---
+    { 
+        $project: {
+            titre: 1,
+            prix: 1,
+            category: 1,
+            imagesUrls: 1,
+            avgNote: 1,
+            nbrRatings: 1,
+            // Only take specific pro fields, ignore 'isBanned', 'password', etc.
+            professionnelId: {
+                _id: '$pro._id',
+                nom: '$pro.nom',
+                prenom: '$pro.prenom'
+            }
+        } 
+    }
+]); 
+
+        // 3. Get Accurate Total Count
         const total = await Service.aggregate([
             { $match: filter },
-            { $lookup: { from: 'users', localField: 'professionnelId', foreignField: '_id', as: 'professionnel' } },
-            { $unwind: '$professionnel' },
-            { $match: { 'professionnel.role': 'professionnel', 'professionnel.isVerified': true } },
+            { $lookup: { from: 'users', localField: 'professionnelId', foreignField: '_id', as: 'prof' } },
+            { $unwind: '$prof' },
+            { $match: { 'prof.role': 'professionnel', 'prof.isVerified': true } },
             { $count: 'total' }
         ]);
 
         const totalCount = total[0]?.total || 0;
 
-        const services = await Service.find(filter)
-            .limit(limit)
-            .skip((page - 1) * limit)
-            .populate('professionnelId', 'nom prenom email role isVerified');
-
-        const activeServices = services.filter(service => {
-            const professionnel = service.professionnelId;
-            return professionnel && professionnel.role === 'professionnel' && professionnel.isVerified;
-        });
-
         res.status(200).json({
-            services: activeServices,
+            services: services,
             totalPages: Math.ceil(totalCount / limit)
         });
     } catch (error) {
@@ -93,7 +125,7 @@ exports.deleteService = async (req, res) => {
         if (!service) {
             return res.status(404).json({ message: "Service not found" });
         }
-        if (service.professionnelId.toString() !== req.user._id.toString()) {
+        if (service.professionnelId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
             return res.status(403).json({ message: "Not authorized" });
         }
         await Demande.deleteMany({  service: id });
@@ -135,9 +167,7 @@ exports.updateService = async (req, res) => {
       return res.status(404).json({ message: "Service not found" }); 
     } 
     
-    if (service.professionnelId.toString() !== req.user._id.toString()) { 
-      return res.status(403).json({ message: "Not authorized" }); 
-    }
+  
     let imagesUrls = [];
 
     if (existingImages && existingImages !== 'undefined') {
@@ -177,4 +207,17 @@ exports.updateService = async (req, res) => {
     console.error("Full error:", error);
     res.status(500).json({ message: error.message }); 
   } 
+}
+exports.getServicesProId = async (req, res) => {
+    try{
+        const id = req.params.id;
+        if(!id){
+            return res.status(400).json({message:"ID du professionnel est requis"});
+        }
+        const services = await Service.find({ professionnelId: id });
+        res.status(200).json(services);
+    }
+    catch(error){
+        res.status(500).json({message:error.message});
+    }
 }

@@ -4,4 +4,5 @@ const CommentsController = require('../controllers/CommentsController');
 const authMiddleware = require('../middleware/authMiddleware');
 router.post('/ajouter', authMiddleware, CommentsController.ajouterCommentaire);
 router.get('/service/:serviceId', CommentsController.getCommentairesParService);
+router.get('/avgNote/:id',CommentsController.getRatingPerService);
 module.exports = router;

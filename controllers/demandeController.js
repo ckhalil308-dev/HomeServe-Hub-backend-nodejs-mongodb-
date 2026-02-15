@@ -1,208 +1,202 @@
-const Demande = require('../models/Demande');
-const Service = require('../models/Service');
-exports.createDemande = async (req, res) => {
-    try {
-        const { service, description, prix, dateIntervention, adresse, numeroTelephone } = req.body;
-        const existService = await Service.findById(service);
-        if (!existService) {
-            return res.status(404).json({ message: "Service introuvable" });
-        }
-        prixService = existService.prix;
-        if (prix < prixService) {
-            return res.status(400).json({ message: `Le prix doit être au minimum ${prixService} TND` });
-        }
+import React, { useState } from 'react';
+import { FileText, Calendar, Send, ArrowLeft, MapPin, Phone, Sparkles, Loader, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { createDemande } from '../../../api/Demande.Api';
+import { updateNeed } from '../../../api/AI.api';
 
-        const DemandeData = {
-            client: req.user._id,
-            service,
-            description,
-            prix,
-            dateIntervention,
-            adresse,
-            numeroTelephone
-        };
-        existentDemande = await Demande.findOne({ client: req.user._id, service, status: { $in: ["En attente", "Offre envoyée"] } });
-        if (new Date(dateIntervention) < new Date()) {
-            return res.status(400).json({ message: "La date d'intervention doit être une date future" });
-        }
-        if (existentDemande) {
-            return res.status(400).json({ message: "Vous avez déjà une demande en cours pour ce service" });
-        }
-        const nouvelleDemande = await Demande.create(DemandeData);
+function ReserverService({ setCommander, service }) {
+  const [loadingAI, setLoadingAI] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [error, setError] = useState({});
+  const [form, setForm] = useState({
+    description: '',
+    date: '', 
+    adresse: '',
+    numeroTelephone: ''
+  });
 
-        res.status(201).json({ message: "Demande créée", demande: nouvelleDemande });
-
-    }
-    catch (error) {
-        return res.status(500).json({ message: 'Server Error', error: error.message });
-
-    }
-
-
-
-}
-exports.geteDemandeForPro = async (req, res) => {
-    try {
-        const proId = req.user._id;
-        const services = await Service.find({ professionnelId: proId }).select('_id').sort({ createdAt: -1 });
-        const mesServicesIds = services.map(service => service._id);
-        const demandes = await Demande.find({ service: { $in: mesServicesIds } }).populate('client', 'nom prenom email').populate('service', 'nom titre description prix').sort({ createdAt: -1 });
-        res.status(200).json(demandes);
-    }
-    catch (error) {
-        res.status(500).json({ message: "Erreur serveur", error: error.message });
-
-
-    }
-}
-exports.geteDemandeForClient = async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = 5;
-    const skip = (page - 1) * limit;
-
-    const clientId = req.user._id;
-    const status = req.query.status; // optionnel
-
-    const filter = { client: clientId };
-
-    if (status && status !== 'tous') {
-      filter.status = status;
-    }
-    const touslesDemandesCount = await Demande.countDocuments({ client: clientId });
-    const demandesTermineesCount = await Demande.countDocuments({ client: clientId, status: 'Termine' });
-    const demandesEnAttenteCount = await Demande.countDocuments({ client: clientId, status: 'En attente' });
-    const demandesOffreEnvoyeeCount = await Demande.countDocuments({ client: clientId, status: 'Offre envoyée' });
-    const demandesApprouveCount = await Demande.countDocuments({ client: clientId, status: 'Approuve' });
-    const demandesRejeteCount = await Demande.countDocuments({ client: clientId, status: 'Rejete' });
-   
-    const demandes = await Demande.find(filter)
-      .populate({
-        path: 'service',
-        select: 'titre description prix professionnelId',
-        populate: {
-          path: 'professionnelId',
-          select: 'nom prenom email'
-        }
-      })
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    res.status(200).json({
-      demandes,
-      touslesDemandesCount,
-      demandesTermineesCount,
-      demandesEnAttenteCount,
-      demandesOffreEnvoyeeCount,
-      demandesApprouveCount,
-      demandesRejeteCount
+  const validateForm = () => {
+    const newErrors = {};
+    if (!form.description) newErrors.description = "Veuillez décrire votre besoin.";
+    if (!form.date) newErrors.date = "La date est obligatoire.";
     
-    });
+    const selectedDate = new Date(form.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selectedDate < today) newErrors.date = "Choisissez une date aujourd'hui ou dans le futur.";
 
-  } catch (error) {
-    res.status(500).json({ message: "Erreur serveur", error: error.message });
+    if (!form.adresse) newErrors.adresse = "L'adresse d'intervention est requise.";
+    if (!form.numeroTelephone) newErrors.numeroTelephone = "Le numéro est requis.";
+    if (!form.numeroTelephone.match(/^(?:\+216|216)?[2-9]\d{7}$/)) newErrors.numeroTelephone = "Format de numéro invalide.";
+
+    setError(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitError('');
+    
+    if (!validateForm()) return;
+    setLoading(true);
+    
+    const formData = {
+      service: service._id,
+      description: form.description,
+      prix: Number(service.prix),
+      dateIntervention: form.date,
+      adresse: form.adresse,
+      numeroTelephone: form.numeroTelephone
+    };
+
+    try {
+      await createDemande(formData);
+      setIsSuccess(true);
+      // On attend 2 secondes avant de fermer pour que l'utilisateur voit le succès
+      setTimeout(() => setCommander(false), 2000);
+    } catch (err) {
+      const backendMessage = err.response?.data?.message || "Une erreur est survenue lors de l'envoi.";
+      setSubmitError(backendMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateNeed = async () => {
+    if (!form.description) return;
+    setLoadingAI(true);
+    try {
+      const des = { topic: form.description };
+      const updatedDescription = await updateNeed(des);
+      setForm(prev => ({ ...prev, description: updatedDescription.reformulatedNeed }));
+    } catch (error) {
+      console.error("AI Error:", error);
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
+  // Si succès, on affiche un message propre au lieu d'une alerte
+  if (isSuccess) {
+    return (
+      <div className="max-w-2xl mx-auto bg-white rounded-3xl p-12 shadow-2xl border border-slate-100 text-center">
+        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <CheckCircle2 size={40} className="text-green-600" />
+        </div>
+        <h2 className="text-2xl font-black text-slate-900 mb-2">Demande envoyée !</h2>
+        <p className="text-slate-500">Votre commande a été traitée avec succès.</p>
+      </div>
+    );
   }
-};
-exports.updateStatus = async (req, res) => {
-    try {
-        const demandeId = req.params.id;
-        const { status } = req.body;
 
-        // if(status!="Offre envoyée" ||  status!=" En attente" ){
-        //     return res.status(400).json({message:"Statut invalide1"});
-        // }
-        const validStatus = ['Approuve', 'Rejete', 'Termine'];
-        if (!validStatus.includes(status)) {
-            return res.status(400).json({ message: "Statut invalide2" });
-        }
-        const demande = await Demande.findById(demandeId);
-        if (!demande) {
-            return res.status(404).json({ message: "Demande introuvable" });
-        }
-        demande.status = status;
-        await demande.save();
-        res.status(200).json({ message: "Statut mis à jour", demande });
-    }
-    catch (error) {
-        res.status(500).json({ message: "Erreur serveur", error: error.message });
-    }
+  return (
+    <div className="max-w-2xl mx-auto bg-white rounded-3xl p-8 shadow-2xl border border-slate-100">
+      <div className="mb-8">
+        <h2 className="text-2xl font-black text-slate-900 tracking-tight">Passer une commande</h2>
+        <p className="text-slate-500 text-sm italic">Service : <span className="font-bold text-blue-600">{service?.titre}</span></p>
+      </div>
+
+      {submitError && (
+        <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-800 rounded-r-xl flex items-center gap-3">
+          <AlertCircle size={20} className="shrink-0" />
+          <p className="text-sm font-bold">{submitError}</p>
+        </div>
+      )}
+
+      <div className="space-y-6">
+        {/* Adresse */}
+        <div className="space-y-1">
+          <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 ml-1">
+            <MapPin size={12} /> Adresse complète
+          </label>
+          <input 
+            className={`w-full bg-slate-50 border-2 ${error.adresse ? 'border-red-200 bg-red-50/30' : 'border-slate-100'} rounded-2xl p-4 text-sm focus:ring-4 focus:ring-blue-500/5 focus:bg-white focus:border-blue-500 outline-none transition-all`} 
+            type="text" 
+            placeholder="N°, Rue, Ville, Gouvernorat..."
+            value={form.adresse}
+            onChange={(e) => setForm({...form, adresse: e.target.value})}
+          />
+          {error.adresse && <p className="text-red-600 text-xs font-bold mt-1 ml-2">{error.adresse}</p>}
+        </div>
+
+        {/* Grille Téléphone / Date */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 ml-1">
+              <Phone size={12} /> Téléphone
+            </label>
+            <input 
+              className={`w-full bg-slate-50 border-2 ${error.numeroTelephone ? 'border-red-200 bg-red-50/30' : 'border-slate-100'} rounded-2xl p-4 text-sm focus:ring-4 focus:ring-blue-500/5 focus:bg-white focus:border-blue-500 outline-none transition-all`} 
+              type="tel" 
+              placeholder="Ex: 216XXXXXXXX"
+              value={form.numeroTelephone}
+              onChange={(e) => setForm({...form, numeroTelephone: e.target.value})}
+            />
+            {error.numeroTelephone && <p className="text-red-600 text-xs font-bold mt-1 ml-2">{error.numeroTelephone}</p>}
+          </div>
+          <div className="space-y-1">
+            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 ml-1">
+              <Calendar size={12} /> Date souhaitée
+            </label>
+            <input 
+              className={`w-full bg-slate-50 border-2 ${error.date ? 'border-red-200 bg-red-50/30' : 'border-slate-100'} rounded-2xl p-4 text-sm focus:ring-4 focus:ring-blue-500/5 focus:bg-white focus:border-blue-500 outline-none transition-all`} 
+              type="date" 
+              value={form.date}
+              onChange={(e) => setForm({...form, date: e.target.value})}
+            />
+            {error.date && <p className="text-red-600 text-xs font-bold mt-1 ml-2">{error.date}</p>}
+          </div>
+        </div>
+
+        {/* Description & AI Button */}
+        <div className="space-y-2 pt-2">
+          <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 ml-1">
+            <FileText size={12} /> Détails de votre besoin
+          </label>
+          <textarea 
+            className={`w-full bg-slate-50 border-2 ${error.description ? 'border-red-200 bg-red-50/30' : 'border-slate-100'} rounded-2xl p-4 text-sm focus:ring-4 focus:ring-blue-500/5 focus:bg-white focus:border-blue-500 outline-none transition-all resize-none min-h-[130px]`} 
+            placeholder="Décrivez votre besoin simplement..."
+            value={form.description}
+            onChange={(e) => setForm({...form, description: e.target.value})}
+          />
+          {error.description && <p className="text-red-600 text-xs font-bold mt-1 ml-2">{error.description}</p>}
+
+          <div className="flex flex-col sm:flex-row items-center gap-4 bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50">
+            <button 
+              type="button"
+              onClick={handleUpdateNeed} 
+              disabled={loadingAI || !form.description}
+              className="relative whitespace-nowrap px-6 py-3.5 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-xl font-black text-[10px] flex items-center gap-2 shadow-lg shadow-blue-200 hover:shadow-blue-300 transition-all active:scale-95 disabled:opacity-50 tracking-widest group"
+            >
+              {loadingAI ? <Loader size={14} className="animate-spin" /> : <><Sparkles size={14} /> AMÉLIORER AVEC AI</>}
+            </button>
+            <p className="text-[11px] text-slate-600 font-medium">
+               ✨ Écrivez normalement, l'IA reformulera tout pour le professionnel.
+            </p>
+          </div>
+        </div>
+
+        {/* Actions finales */}
+        <div className="flex gap-3 pt-6 border-t border-slate-50">
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="flex-1 bg-slate-900 hover:bg-black text-white rounded-2xl py-4 font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-xl shadow-slate-200 disabled:opacity-50"
+          >
+            {loading ? <Loader className="animate-spin" /> : <><Send size={16} /> Envoyer la demande</>}
+          </button>
+          <button 
+            type="button"
+            onClick={() => setCommander(false)} 
+            className="px-6 py-4 text-slate-400 font-bold text-xs uppercase tracking-widest hover:text-slate-600 transition-colors"
+          >
+            Annuler
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
-exports.ProposerPrix = async (req, res) => {
-    try {
-        const demandeId = req.params.id;
-        const { prix } = req.body;
-        const demande = await Demande.findById(demandeId);
-        if (!demande) {
-            return res.status(404).json({ message: "Demande introuvable" });
-        }
-        demande.prix = prix;
-        demande.status = "Offre envoyée";
-        await demande.save();
-        res.status(200).json({ message: "Prix proposé avec succès", demande });
-    }
-    catch (error) {
-        res.status(500).json({ message: "Erreur serveur", error: error.message });
-    }
-}
-exports.getDemandeById = async (req, res) => {
-    try {
-        const id = req.params.id;
-        const demande = await Demande.findById(id).populate('client', 'nom prenom email').populate('service', 'nom titre description prix');
-        if (!demande) {
-            return res.status(404).json({ message: "Demande introuvable" });
-        }
-        const statutsVisibles = ['Approuve', 'Termine'];
-        if (!statutsVisibles.includes(demande.status)) {
-            demande.numeroTelephone = "Masqué";
-            if (demande.client) {
-                demande.client.email = "Masqué";
-            }
-        }
-        res.status(200).json(demande);
 
-
-    }
-    catch (error) {
-        res.status(500).json({ message: "Erreur serveur", error: error.message });
-    }
-}
-exports.getAllDemandes = async (req, res) => {
-    try {
-        const Statut=req.query.status ||"";
-        const filter = {};
-            if (Statut && Statut !== 'Tous') {
-                     filter.status = Statut;
-             }
-        const page=req.query.page ||1;
-        const limit=10;
-        const skip=(page-1)*limit;
-        const demandes = await Demande.find(filter).populate({
-            path: 'client',
-            select: 'nom prenom email'
-        }).populate({
-            path: 'service', select: ' titre description prix category',
-        }).sort({ createdAt: -1 }).skip(skip).limit(limit);
-         const DemandeRecentes = await Demande.find().populate({
-            path: 'client',
-            select: 'nom prenom email'
-        }).populate({
-            path: 'service', select: ' titre description prix category',
-        }).sort({ createdAt: -1 })
-                                                      .limit(5);
-        const DemandeTerminees = demandes.filter(demande => demande.status === 'Termine');
-        const total = await Demande.countDocuments(filter);
-        res.status(200).json({
-            demandes,
-            total: total,
-            termine: DemandeTerminees.length,
-            recentes: DemandeRecentes
-        });
-    }
-    catch (error) {
-        res.status(500).json({ message: "Erreur serveur", error: error.message });
-    }
-
-
-
-}
+export default ReserverService;
