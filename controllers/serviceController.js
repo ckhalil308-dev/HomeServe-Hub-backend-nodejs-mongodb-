@@ -18,21 +18,15 @@ exports.getAllServices = async (req, res) => {
         }
         if (search) filter.titre = { $regex: search, $options: 'i' };
 
-        // 2. Main Aggregation Pipeline
       const services = await Service.aggregate([
     { $match: filter },
     
-    // Join with Users
     { $lookup: { from: 'users', localField: 'professionnelId', foreignField: '_id', as: 'pro' } },
     { $unwind: '$pro' },
-    
-    // Security Filter (Verified only)
+
     { $match: { 'pro.role': 'professionnel', 'pro.isVerified': true } },
 
-    // Join with Comments
     { $lookup: { from: 'commentaires', localField: '_id', foreignField: 'service', as: 'ratings' } },
-
-    // Add calculations
     {
         $addFields: {
             avgNote: { $ifNull: [{ $avg: "$ratings.note" }, 0] },
